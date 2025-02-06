@@ -1,13 +1,16 @@
 {
   "DeviceName": "home",
-  "interval": 60,
-  "ipSyncUrl": "http://your_server_domain_or_IP/ip.php",
-  "email": {
-    "smtpServer": "smtp.example.com",
-    "smtpPort": 587,
-    "username": "your_email@example.com",
-    "password": "your_password",
-    "toAddress": "recipient@example.com",
-    "EnableSsl": true
+  "IsIPv6": true,
+  "Interval": 60,
+  "IpSyncUrl": "http://www.test.com/ip.php",
+  "ApiPswd": "your_password",
+  "Email": {
+    "TitlePrefix": "[IP]",
+    "SmtpServer": "smtp.example.com",
+    "SmtpPort": 25,
+    "Username": "your_email@example.com",
+    "Password": "your_password",
+    "ToAddress": "recipient@example.com",
+    "EnableSsl": false
   }
 }

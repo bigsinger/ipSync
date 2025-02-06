@@ -15,30 +15,29 @@ internal class Program {
         LogManager.Setup().LoadConfigurationFromFile("NLog.config");
 
         // 读取配置文件
-        config = JsonSerializer.Deserialize<Config>(File.ReadAllText(@"..\Data\config.json")) ?? config;
+        config = JsonSerializer.Deserialize<Config>(File.ReadAllText(@"config.json")) ?? config;
 
         // 读取上次的IP
         LoadLastIP();
 
         logger.Info("程序已启动，正在监控IP地址变化...");
 
-        // 调用一次函数功能
-        CheckIP();
-
         // 定时调用函数功能
-        var timer = new Timer(TimerCallback, null, config.Interval * 1000, config.Interval * 1000);
-    }
-
-    private static void TimerCallback(object? state) {
-        CheckIP();
+        do {
+            CheckIP();
+            Thread.Sleep(TimeSpan.FromSeconds(config.Interval));
+        } while (true);
     }
 
     private static void CheckIP() {
         string currentIP = GetLocalIPAddress();
         if (currentIP != lastIP) {
+            logger.Info("IP发生变化，当前IP：" + currentIP);
             lastIP = currentIP;
             SaveLastIP(currentIP);
             SyncIP(currentIP);
+        } else {
+            logger.Debug("IP未发生变化，当前IP：" + currentIP);
         }
     }
 
@@ -67,34 +66,36 @@ internal class Program {
             }
         }
 
-        return ipv6Address ?? ipv4Address;
+        return config.IsIPv6 ? ipv6Address : ipv4Address;
     }
 
     private static void SyncIP(string ip) {
         SendEmail(ip);
-        SyncToServer(ip);
+        SyncToServer(config.DeviceName, ip);
     }
 
     private static void SendEmail(string ip) {
         try {
             logger.Info("邮件同步IP");
-            string text = $"[ip]:{config.DeviceName}={ip}";
+            string body = $"{config.DeviceName}={ip}";
+            string subject = $"{config.Email.TitlePrefix}" + body;
 
             // 创建MailMessage对象
             MailMessage mail = new MailMessage {
                 From = new MailAddress(config.Email.Username),
-                Subject = text,
-                Body = text
+                Subject = subject,
+                Body = body,
+                IsBodyHtml = false
             };
             mail.To.Add(config.Email.ToAddress);
 
             // 创建SmtpClient对象
-            using (SmtpClient smtpClient = new SmtpClient(config.Email.SmtpServer, config.Email.SmtpPort)) {
-                smtpClient.EnableSsl = config.Email.EnableSsl;
-                smtpClient.Credentials = new NetworkCredential(config.Email.Username, config.Email.Password);
+            using (var client = new SmtpClient(config.Email.SmtpServer, config.Email.SmtpPort)) {
+                client.EnableSsl = config.Email.EnableSsl;
+                client.Credentials = new NetworkCredential(config.Email.Username, config.Email.Password);
 
                 // 发送邮件
-                smtpClient.Send(mail);
+                client.Send(mail);
             }
 
             logger.Info("邮件同步成功!");
@@ -104,11 +105,11 @@ internal class Program {
 
     }
 
-    private static void SyncToServer(string ip) {
+    private static void SyncToServer(string name, string ip) {
         var client = new RestClient(config.IpSyncUrl);
         var request = new RestRequest();
-        request.AddParameter("name", "test");
-        request.AddParameter("pswd", "your_password_here");
+        request.AddParameter("pswd", config.ApiPswd);
+        request.AddParameter("name", name);
         request.AddParameter("ip", ip);
 
         var response = client.Execute(request);
